@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pathfinding with Dijkstra and A*</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Roboto", sans-serif;
+        background: linear-gradient(to right, #e0eafc, #cfdef3);
+        text-align: center;
+        margin: 0;
+        padding: 20px;
+      }
+
+      h1 {
+        color: #2c3e50;
+        margin-bottom: 20px;
+        font-size: 2.5em;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+      }
+
+      #grid {
+        display: grid;
+        grid-template-columns: repeat(20, 25px);
+        grid-template-rows: repeat(20, 25px);
+        gap: 2px;
+        margin: 20px auto;
+        max-width: 550px;
+        border: 2px solid #3498db;
+        border-radius: 10px;
+        padding: 10px;
+        background-color: #ffffff;
+      }
+
+      .cell {
+        width: 25px;
+        height: 25px;
+        background-color: #f0f0f0;
+        border: 1px solid #ccc;
+        cursor: pointer;
+        transition: background-color 0.3s, transform 0.2s;
+      }
+
+      .cell:hover {
+        background-color: #d1ecf1;
+        transform: scale(1.05);
+        border-color: #3498db;
+      }
+
+      .cell.start {
+        background-color: #28a745;
+      }
+      .cell.end {
+        background-color: #dc3545;
+      }
+      .cell.obstacle {
+        background-color: #343a40;
+      }
+      .cell.path {
+        background-color: #ffc107;
+      }
+      .cell.path-a-star {
+        background-color: #007bff;
+      }
+      .cell.bloom {
+        background-color: #ffdd57;
+      }
+
+      button {
+        margin: 20px;
+        padding: 10px 20px;
+        font-size: 16px;
+        border: none;
+        border-radius: 5px;
+        color: #fff;
+        background: linear-gradient(to right, #3498db, #2980b9);
+        cursor: pointer;
+        transition: background-color 0.3s, transform 0.2s;
+      }
+
+      button:hover {
+        background: linear-gradient(to right, #2980b9, #3498db);
+        transform: scale(1.05);
+      }
+
+      #algorithm-selection {
+        margin: 20px;
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+      }
+
+      label {
+        font-weight: 600;
+        color: #34495e;
+      }
+
+      @media (max-width: 600px) {
+        #grid {
+          grid-template-columns: repeat(10, 25px);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Pathfinding with Dijkstra and A*</h1>
+
+    <div id="algorithm-selection">
+      <label>
+        <input type="radio" name="algorithm" value="dijkstra" checked />
+        Dijkstra's Algorithm
+      </label>
+      <label>
+        <input type="radio" name="algorithm" value="a-star" />
+        A* Algorithm
+      </label>
+    </div>
+
+    <div id="grid"></div>
+
+    <button id="start-simulation">Start Simulation</button>
+    <button id="reset-button">Reset Grid</button>
+
+    <script>
+      let gridSize = 20;
+      let grid = [];
+      let startNode = null;
+      let endNode = null;
+      let simulationRunning = false;
+      let currentPath = [];
+
+      const gridElement = document.getElementById("grid");
+      initializeGrid();
+
+      function initializeGrid() {
+        gridElement.innerHTML = "";
+        for (let i = 0; i < gridSize; i++) {
+          grid[i] = [];
+          for (let j = 0; j < gridSize; j++) {
+            grid[i][j] = 0;
+            const cell = document.createElement("div");
+            cell.classList.add("cell");
+            cell.dataset.row = i;
+            cell.dataset.col = j;
+            cell.addEventListener("click", handleCellClick);
+            gridElement.appendChild(cell);
+          }
+        }
+      }
+
+      function handleCellClick(event) {
+        const row = event.target.dataset.row;
+        const col = event.target.dataset.col;
+
+        if (!startNode) {
+          startNode = { row, col };
+          event.target.classList.add("start");
+        } else if (!endNode) {
+          endNode = { row, col };
+          event.target.classList.add("end");
+        } else {
+          if (
+            !(startNode.row == row && startNode.col == col) &&
+            !(endNode.row == row && endNode.col == col)
+          ) {
+            if (grid[row][col] !== 1) {
+              grid[row][col] = 1;
+              event.target.classList.add("obstacle");
+
+              if (
+                currentPath.some(
+                  ([pathRow, pathCol]) => pathRow == row && pathCol == col
+                )
+              ) {
+                resetPath();
+                startSimulation();
+              }
+            }
+          }
+        }
+      }
+
+      document
+        .getElementById("start-simulation")
+        .addEventListener("click", startSimulation);
+
+      function startSimulation() {
+        if (simulationRunning) {
+          alert("Simulation is already running.");
+          return;
+        }
+
+        if (!startNode || !endNode) {
+          alert("Please select both a start and end node.");
+          return;
+        }
+
+        simulationRunning = true;
+        const selectedAlgorithm = document.querySelector(
+          'input[name="algorithm"]:checked'
+        ).value;
+
+        const csrfToken = "{{ csrf_token }}";
+        fetch("", {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": csrfToken,
+          },
+          body: new URLSearchParams({
+            grid: JSON.stringify(grid),
+            start: JSON.stringify([parseInt(startNode.row), parseInt(startNode.col)]),
+            end: JSON.stringify([parseInt(endNode.row), parseInt(endNode.col)]),
+            algorithm: selectedAlgorithm,
+          }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            currentPath = data.path;
+            startBloomEffect(selectedAlgorithm, currentPath);
+          })
+          .catch((error) => console.error("Error:", error));
+      }
+
+      function startBloomEffect(algorithm, path) {
+        let index = 0;
+        const interval = setInterval(() => {
+          if (index < path.length) {
+            const [row, col] = path[index];
+            const cell = document.querySelector(
+              `[data-row='${row}'][data-col='${col}']`
+            );
+            if (cell) {
+              cell.classList.add("bloom");
+            }
+            index++;
+          } else {
+            clearInterval(interval);
+            highlightPath(path, algorithm);
+            simulationRunning = false;
+          }
+        }, 100);
+      }
+
+      function highlightPath(path, algorithm) {
+        path.forEach(([row, col]) => {
+          const cell = document.querySelector(
+            `[data-row='${row}'][data-col='${col}']`
+          );
+          if (algorithm === "a-star") {
+            cell.classList.add("path-a-star");
+          } else {
+            cell.classList.add("path");
+          }
+        });
+      }
+
+      function resetPath() {
+        currentPath.forEach(([row, col]) => {
+          const cell = document.querySelector(
+            `[data-row='${row}'][data-col='${col}']`
+          );
+          if (cell) {
+            cell.classList.remove("path", "path-a-star", "bloom");
+          }
+        });
+        currentPath = [];
+      }
+
+      document.getElementById("reset-button").addEventListener("click", resetGrid);
+
+      function resetGrid() {
+        grid = [];
+        startNode = null;
+        endNode = null;
+        simulationRunning = false;
+        currentPath = [];
+        const cells = document.querySelectorAll(".cell");
+        cells.forEach((cell) => {
+          cell.classList.remove(
+            "start",
+            "end",
+            "obstacle",
+            "path",
+            "path-a-star",
+            "bloom"
+          );
+        });
+        initializeGrid();
+      }
+    </script>
+  </body>
+</html>
